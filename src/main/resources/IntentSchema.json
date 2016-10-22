@@ -1,0 +1,16 @@
+{
+  "intents": [
+    {
+      "intent": "ResponseIntent",
+      "slots": [
+        {
+          "name": "Answer",
+          "type": "AMAZON.LITERAL"
+        }
+      ]
+    },
+    {
+      "intent": "AMAZON.HelpIntent"
+    }
+  ]
+}
