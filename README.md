@@ -1,10 +1,8 @@
-What is lazytest1
---------------------------------------
+Alexa Groovy Podcast
+--------------------
 
-You've just created a basic Alexa Skills Lamba Groovy application. It provides a standard project structure and
-a basic Gradle plugin. Now is up to you to add your source files and edit them with your favorite editor
-and have fun :)
-
+This is an AWS Groovy Lambda Alexa skill for playing podcasts from the 'Groovy Podcast'. 
+This demonstrates the community based java sdk https://github.com/vanderfox/alexa-skills-kit-java that had added Audio Directive support and other current pull requests and bug fixes.
 To build your app:
 gradlew build
 
@@ -20,4 +18,4 @@ gradlew deploy
 
 
 For more detailed directions on getting a skill working see:
-https://github.com/rvanderwerf/alexa-twitter-groovy
+https://github.com/rvanderwerf/alexa-groovy-podcast
