@@ -19,3 +19,6 @@ gradlew deploy
 
 For more detailed directions on getting a skill working see:
 https://github.com/rvanderwerf/alexa-groovy-podcast
+
+
+This skill was generated with Lazybones using the templates here: https://github.com/rvanderwerf/alexa-groovy-lazybones 
