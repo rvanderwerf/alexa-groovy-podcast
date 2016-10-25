@@ -1,16 +1,29 @@
 {
   "intents": [
     {
-      "intent": "ResponseIntent",
+      "intent": "AMAZON.PauseIntent"
+    },
+    {
+      "intent": "AMAZON.ResumeIntent"
+    },
+    {
+      "intent": "PlayEpisodeIntent",
       "slots": [
         {
-          "name": "Answer",
-          "type": "AMAZON.LITERAL"
+          "name": "podcastNumber",
+          "type": "AMAZON.NUMBER"
         }
       ]
     },
     {
       "intent": "AMAZON.HelpIntent"
+    },
+    {
+      "intent": "AMAZON.StopIntent"
+    },
+    {
+      "intent": "AMAZON.CancelIntent"
     }
+
   ]
 }

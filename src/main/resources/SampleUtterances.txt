@@ -1,7 +1,7 @@
-ResponseIntent {test|Answer}
-ResponseIntent {last player|Answer}
-ResponseIntent {test test|Answer}
-ResponseIntent {test test test|Answer}
-ResponseIntent {test test test test|Answer}
-HelpIntent {help}
-
+PlayEpisodeIntent play {podcastNumber}
+PlayEpisodeIntent play number {podcastNumber}
+PlayEpisodeIntent play episode {podcastNumber}
+PlayEpisodeIntent play episode number {podcastNumber}
+AMAZON.HelpIntent help
+AMAZON.StopIntent stop
+AMAZON.CancelIntent cancel
