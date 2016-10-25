@@ -15,7 +15,9 @@ import com.amazon.speech.speechlet.SessionStartedRequest
 import com.amazon.speech.speechlet.Speechlet
 import com.amazon.speech.speechlet.SpeechletException
 import com.amazon.speech.speechlet.SpeechletResponse
+import com.amazon.speech.speechlet.SystemExceptionEncounteredRequest
 import com.amazon.speech.ui.AudioDirective
+import com.amazon.speech.ui.AudioDirectiveClearQueue
 import com.amazon.speech.ui.AudioDirectivePlay
 import com.amazon.speech.ui.AudioItem
 import com.amazon.speech.ui.PlainTextOutputSpeech
@@ -26,12 +28,7 @@ import com.amazon.speech.ui.Stream
 import groovy.transform.CompileStatic
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory
-import com.amazonaws.services.dynamodbv2.document.DynamoDB
-import com.amazonaws.services.dynamodbv2.document.Table
-import com.amazonaws.services.dynamodbv2.document.Item
-import com.amazonaws.services.dynamodbv2.model.ScanRequest
-import com.amazonaws.services.dynamodbv2.model.ScanResult
-import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
+
 
 /**
  * This app shows how to connect to hero with Spring Social, Groovy, and Alexa.
@@ -43,28 +40,40 @@ public class DemoSpeechlet implements Speechlet {
     String title = "Demo Skill"
 
     @Override
-    void onPlaybackStarted(PlaybackStartedRequest playbackStartedRequest) throws SpeechletException {
+    SpeechletResponse onPlaybackStarted(PlaybackStartedRequest playbackStartedRequest) throws SpeechletException {
 
+        // don't do anything must return at least an empty list
+        SpeechletResponse.newTellResponse([] as List<AudioDirective>)
     }
 
     @Override
-    void onPlaybackFinished(PlaybackFinishedRequest playbackFinishedRequest) throws SpeechletException {
+    SpeechletResponse onPlaybackFinished(PlaybackFinishedRequest playbackFinishedRequest) throws SpeechletException {
 
+        SpeechletResponse.newTellResponse([] as List<AudioDirective>)
     }
 
     @Override
     void onPlaybackStopped(PlaybackStoppedRequest playbackStoppedRequest) throws SpeechletException {
-
+        // cannot return anything here
     }
 
     @Override
-    void onPlaybackNearlyFinished(PlaybackNearlyFinishedRequest playbackNearlyFinishedRequest) throws SpeechletException {
+    SpeechletResponse onPlaybackNearlyFinished(PlaybackNearlyFinishedRequest playbackNearlyFinishedRequest) throws SpeechletException {
 
+        // do nothing
+        SpeechletResponse.newTellResponse([] as List<AudioDirective>)
     }
 
     @Override
-    void onPlaybackFailed(PlaybackFailedRequest playbackFailedRequest) throws SpeechletException {
+    SpeechletResponse onPlaybackFailed(PlaybackFailedRequest playbackFailedRequest) throws SpeechletException {
+        //clear queue as something is wrong
+        AudioDirectiveClearQueue audioDirectiveClearQueue = new AudioDirectiveClearQueue()
+        SpeechletResponse.newTellResponse([audioDirectiveClearQueue] as List<AudioDirective>)
+    }
 
+    @Override
+    void onSystemException(SystemExceptionEncounteredRequest systemExceptionEncounteredRequest) throws SpeechletException {
+        log.debug("error encountered: cause: ${systemExceptionEncounteredRequest.cause.requestId} error: ${systemExceptionEncounteredRequest.error.message}")
     }
 
     @Override
