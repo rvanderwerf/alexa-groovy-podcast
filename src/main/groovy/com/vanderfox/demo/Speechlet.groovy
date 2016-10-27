@@ -26,8 +26,11 @@ import com.amazon.speech.ui.SimpleCard
 import com.amazon.speech.ui.SsmlOutputSpeech
 import com.amazon.speech.ui.Stream
 import groovy.transform.CompileStatic
+import groovy.transform.TypeCheckingMode
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory
+
+import java.util.regex.Pattern
 
 
 /**
@@ -127,12 +130,13 @@ public class DemoSpeechlet implements Speechlet {
     }
 
 
+	@CompileStatic(TypeCheckingMode.SKIP) // do some meta stuff
     public SpeechletResponse playEpisode(IntentRequest request, Session session) {
 
 
         Slot episodeNumber = request.intent.getSlot("podcastNumber")
 
-        log.debug("episodeNumber:"+episodeNumber)
+        log.debug("episodeNumber:"+episodeNumber.value)
 
         String speechText = "Starting playback of Groovy Podcast Episode ${episodeNumber?.value}"
         // Create the Simple card content.
@@ -141,12 +145,35 @@ public class DemoSpeechlet implements Speechlet {
         card.setContent(speechText) //TODO auto retrieve show notes here
 
 
+		String streamUrl = ""
+		def rssFeed = "https://groovypodcast.podbean.com/feed/".toURL().text
+		//log.debug("rss feed:${rssFeed}")
+        def slurper = new XmlParser(false,false).parseText(rssFeed)
+        if (slurper) {
+			slurper.channel.item.each { item ->
+				//log.debug("item content:${item}")
+				log.debug("found item:"+item.title.text())
+				log.debug("found link:"+item.link.text())
+				log.debug("found enclosure:"+item.enclosure)
+				log.debug("found enclosure url:"+item.enclosure.@url.value[0])
+				if (item.title.text().indexOf(episodeNumber.value)!= -1) {
+					log.debug("found episode:${episodeNumber.value} streamurl:${item.enclosure.@url.value[0]}")
+					streamUrl = item.enclosure.@url.value[0].toString()
+				}
+
+			}
+		}
+		log.debug("streamUrl:${streamUrl}")
+		// replace http with https or alexa won't play it
+		streamUrl = streamUrl.replaceAll('http','https')
+		log.debug("streamUrl replaced:${streamUrl}")
 
 
         Stream audioStream = new Stream()
         audioStream.offsetInMilliseconds = 0
-        audioStream.url = "https://groovypodcast.podbean.com/mf/feed/8ic9x9/Groovy_Podcast_Ep_35.mp3"
-        audioStream.setToken("http://groovypodcast.podbean.com/mf/feed/8ic9x9/Groovy_Podcast_Ep_35.mp3".hashCode() as String)
+        //audioStream.url = "https://groovypodcast.podbean.com/mf/feed/8ic9x9/Groovy_Podcast_Ep_35.mp3"
+        audioStream.url = streamUrl
+		audioStream.setToken(streamUrl.hashCode() as String)
         AudioItem audioItem = new AudioItem(audioStream)
 
         AudioDirectivePlay audioPlayerPlay = new AudioDirectivePlay(audioItem)
@@ -175,7 +202,7 @@ public class DemoSpeechlet implements Speechlet {
     private SpeechletResponse getWelcomeResponse(final Session session) {
         String speechText = "Welcome to Groovy Podcast Skill. To start playing a podcast say Play episode number"
 
-        askResponseFancy(speechText, speechText, "https://s3.amazonaws.com/vanderfox-sounds/test.mp3")
+        askResponseFancy(speechText, speechText, "https://s3.amazonaws.com/vanderfox-sounds/groovybaby1.mp3")
 
     }
 
