@@ -169,21 +169,29 @@ public class DemoSpeechlet implements Speechlet {
 		log.debug("streamUrl replaced:${streamUrl}")
 
 
-        Stream audioStream = new Stream()
-        audioStream.offsetInMilliseconds = 0
-        //audioStream.url = "https://groovypodcast.podbean.com/mf/feed/8ic9x9/Groovy_Podcast_Ep_35.mp3"
-        audioStream.url = streamUrl
-		audioStream.setToken(streamUrl.hashCode() as String)
-        AudioItem audioItem = new AudioItem(audioStream)
+		if (streamUrl && streamUrl.size() > 0) {
+			Stream audioStream = new Stream()
+			audioStream.offsetInMilliseconds = 0
+			//audioStream.url = "https://groovypodcast.podbean.com/mf/feed/8ic9x9/Groovy_Podcast_Ep_35.mp3"
+			audioStream.url = streamUrl
+			audioStream.setToken(streamUrl.hashCode() as String)
+			AudioItem audioItem = new AudioItem(audioStream)
 
-        AudioDirectivePlay audioPlayerPlay = new AudioDirectivePlay(audioItem)
+			AudioDirectivePlay audioPlayerPlay = new AudioDirectivePlay(audioItem)
 
-        // Create the plain text output.
-        PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
-        speech.setText(speechText);
+			// Create the plain text output.
+			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
+			speech.setText(speechText)
 
 
-        SpeechletResponse.newTellResponse(speech, card, [audioPlayerPlay] as List<AudioDirective>)
+			SpeechletResponse.newTellResponse(speech, card, [audioPlayerPlay] as List<AudioDirective>)
+		} else {
+			def s = "I'm sorry I can't find that podcast"
+			card.content = s
+			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
+			speech.setText(s);
+			SpeechletResponse.newTellResponse(speech, card)
+		}
 
     }
     @Override
