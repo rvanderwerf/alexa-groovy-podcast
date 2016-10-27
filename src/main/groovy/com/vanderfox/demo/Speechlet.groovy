@@ -147,7 +147,7 @@ public class DemoSpeechlet implements Speechlet {
 
 		String streamUrl = ""
 		def rssFeed = "https://groovypodcast.podbean.com/feed/".toURL().text
-		//log.debug("rss feed:${rssFeed}")
+
         def slurper = new XmlParser(false,false).parseText(rssFeed)
         if (slurper) {
 			slurper.channel.item.each { item ->
@@ -172,7 +172,7 @@ public class DemoSpeechlet implements Speechlet {
 		if (streamUrl && streamUrl.size() > 0) {
 			Stream audioStream = new Stream()
 			audioStream.offsetInMilliseconds = 0
-			//audioStream.url = "https://groovypodcast.podbean.com/mf/feed/8ic9x9/Groovy_Podcast_Ep_35.mp3"
+
 			audioStream.url = streamUrl
 			audioStream.setToken(streamUrl.hashCode() as String)
 			AudioItem audioItem = new AudioItem(audioStream)
