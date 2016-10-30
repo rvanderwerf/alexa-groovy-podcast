@@ -19,6 +19,7 @@ import com.amazon.speech.speechlet.SystemExceptionEncounteredRequest
 import com.amazon.speech.ui.AudioDirective
 import com.amazon.speech.ui.AudioDirectiveClearQueue
 import com.amazon.speech.ui.AudioDirectivePlay
+import com.amazon.speech.ui.AudioDirectiveStop
 import com.amazon.speech.ui.AudioItem
 import com.amazon.speech.ui.PlainTextOutputSpeech
 import com.amazon.speech.ui.Reprompt
@@ -29,9 +30,6 @@ import groovy.transform.CompileStatic
 import groovy.transform.TypeCheckingMode
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory
-
-import java.util.regex.Pattern
-
 
 /**
  * This app shows how to connect to hero with Spring Social, Groovy, and Alexa.
@@ -110,19 +108,23 @@ public class DemoSpeechlet implements Speechlet {
 
         Intent intent = request.getIntent();
         String intentName = (intent != null) ? intent.getName() : null;
-      
+        log.debug("incoming intent:${intentName}")
 
         switch (intentName) {
             case "PlayEpisodeIntent":
-
+			case "AMAZON.ResumeIntent":
                   playEpisode(request,session)
                   break
 
-            case "EndGameIntent":
-                endGame()
-                break
-            case "HelpIntent":
+            case "AMAZON.HelpIntent":
+			case "HelpIntent":
                 getHelpResponse()
+				break
+			case "AMAZON.StopIntent":
+			case "AMAZON.CancelIntent":
+			case "AMAZON.PauseIntent":
+			    stopOrCancelPlayback()
+				break
             default:
                 didNotUnderstand()
                 break
@@ -175,7 +177,9 @@ public class DemoSpeechlet implements Speechlet {
 
 			audioStream.url = streamUrl
 			audioStream.setToken(streamUrl.hashCode() as String)
+			audioStream.offsetInMilliseconds = 0
 			AudioItem audioItem = new AudioItem(audioStream)
+
 
 			AudioDirectivePlay audioPlayerPlay = new AudioDirectivePlay(audioItem)
 
@@ -210,26 +214,27 @@ public class DemoSpeechlet implements Speechlet {
     private SpeechletResponse getWelcomeResponse(final Session session) {
         String speechText = "Welcome to Groovy Podcast Skill. To start playing a podcast say Play episode number"
 
-        askResponseFancy(speechText, speechText, "https://s3.amazonaws.com/vanderfox-sounds/groovybaby1.mp3")
+        //askResponseFancy(speechText, speechText, "https://s3.amazonaws.com/vanderfox-sounds/groovybaby1.mp3")
+		askResponse(speechText, speechText)
 
     }
 
 
     private SpeechletResponse askResponse(String cardText, String speechText) {
         // Create the Simple card content.
-        SimpleCard card = new SimpleCard();
-        card.setTitle(title);
-        card.setContent(cardText);
+        SimpleCard card = new SimpleCard()
+        card.setTitle(title)
+        card.setContent(cardText)
 
         // Create the plain text output.
-        PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-        speech.setText(speechText);
+        PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
+        speech.setText(speechText)
 
         // Create reprompt
-        Reprompt reprompt = new Reprompt();
-        reprompt.setOutputSpeech(speech);
+        Reprompt reprompt = new Reprompt()
+        reprompt.setOutputSpeech(speech)
 
-        SpeechletResponse.newAskResponse(speech, reprompt, card);
+        SpeechletResponse.newAskResponse(speech, reprompt, card)
     }
 
     private SpeechletResponse tellResponse(String cardText, String speechText) {
@@ -279,21 +284,37 @@ public class DemoSpeechlet implements Speechlet {
      * @return SpeechletResponse spoken and visual response for the given intent
      */
     private SpeechletResponse getHelpResponse() {
-        String speechText = "Say Exit Game or Quit Game to stop the game.  Please follow the prompts I give you, and be sure to speak clearly.";
+        String speechText = "Say play episode number to play an episode.";
 
         askResponse(speechText, speechText)
     }
+
+	private SpeechletResponse stopOrCancelPlayback() {
+		AudioDirectiveStop audioDirectiveClearQueue = new AudioDirectiveStop()
+		//audioDirectiveClearQueue.clearBehaviour = "CLEAR_ALL"
+		String speechText = "Stopping. GoodBye."
+		// Create the Simple card content.
+		SimpleCard card = new SimpleCard()
+		card.setTitle(title)
+		card.setContent(speechText)
+
+		// Create the plain text output.
+		PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
+		speech.setText(speechText)
+
+		// Create reprompt
+		Reprompt reprompt = new Reprompt()
+		reprompt.setOutputSpeech(speech)
+
+        log.debug("Stopping intent")
+
+		SpeechletResponse.newTellResponse(speech,card,[audioDirectiveClearQueue] as List<AudioDirective>)
+	}
 
     private SpeechletResponse didNotUnderstand() {
-        String speechText = "I'm sorry.  I didn't understand what you said.  Say help me for help.";
+        String speechText = "I'm sorry.  I didn't understand what you said.  Say play episode number to play an episode.";
 
         askResponse(speechText, speechText)
-    }
-
-    private SpeechletResponse endGame() {
-        String speechText = "OK.  I will stop the game now.  Please try again soon.";
-
-        tellResponse(speechText, speechText)
     }
 
 
