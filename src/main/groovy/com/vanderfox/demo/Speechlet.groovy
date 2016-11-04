@@ -2,6 +2,7 @@ package com.vanderfox.demo
 
 import com.amazon.speech.slu.Intent
 import com.amazon.speech.slu.Slot
+import com.amazon.speech.speechlet.Context
 import com.amazon.speech.speechlet.IntentRequest
 import com.amazon.speech.speechlet.LaunchRequest
 import com.amazon.speech.speechlet.PlaybackFailedRequest
@@ -41,32 +42,32 @@ public class DemoSpeechlet implements Speechlet {
     String title = "Demo Skill"
 
     @Override
-    SpeechletResponse onPlaybackStarted(PlaybackStartedRequest playbackStartedRequest) throws SpeechletException {
+    SpeechletResponse onPlaybackStarted(PlaybackStartedRequest playbackStartedRequest, Context context) throws SpeechletException {
 
         // don't do anything must return at least an empty list
         SpeechletResponse.newTellResponse([] as List<AudioDirective>)
     }
 
     @Override
-    SpeechletResponse onPlaybackFinished(PlaybackFinishedRequest playbackFinishedRequest) throws SpeechletException {
+    SpeechletResponse onPlaybackFinished(PlaybackFinishedRequest playbackFinishedRequest, Context context) throws SpeechletException {
 
         SpeechletResponse.newTellResponse([] as List<AudioDirective>)
     }
 
     @Override
-    void onPlaybackStopped(PlaybackStoppedRequest playbackStoppedRequest) throws SpeechletException {
+    void onPlaybackStopped(PlaybackStoppedRequest playbackStoppedRequest, Context context) throws SpeechletException {
         // cannot return anything here
     }
 
     @Override
-    SpeechletResponse onPlaybackNearlyFinished(PlaybackNearlyFinishedRequest playbackNearlyFinishedRequest) throws SpeechletException {
+    SpeechletResponse onPlaybackNearlyFinished(PlaybackNearlyFinishedRequest playbackNearlyFinishedRequest, Context context) throws SpeechletException {
 
         // do nothing
         SpeechletResponse.newTellResponse([] as List<AudioDirective>)
     }
 
     @Override
-    SpeechletResponse onPlaybackFailed(PlaybackFailedRequest playbackFailedRequest) throws SpeechletException {
+    SpeechletResponse onPlaybackFailed(PlaybackFailedRequest playbackFailedRequest, Context context) throws SpeechletException {
         //clear queue as something is wrong
         AudioDirectiveClearQueue audioDirectiveClearQueue = new AudioDirectiveClearQueue()
         SpeechletResponse.newTellResponse([audioDirectiveClearQueue] as List<AudioDirective>)
@@ -101,7 +102,7 @@ public class DemoSpeechlet implements Speechlet {
     }
 
     @Override
-    public SpeechletResponse onIntent(final IntentRequest request, final Session session)
+    public SpeechletResponse onIntent(final IntentRequest request, final Session session, Context context)
             throws SpeechletException {
         log.info("onIntent requestId={}, sessionId={}", request.getRequestId(),
                 session.getSessionId());
@@ -112,8 +113,10 @@ public class DemoSpeechlet implements Speechlet {
 
         switch (intentName) {
             case "PlayEpisodeIntent":
+				playEpisode(request,session, context)
+				break
 			case "AMAZON.ResumeIntent":
-                  playEpisode(request,session)
+                  resumeEpisode(request,session, context)
                   break
 
             case "AMAZON.HelpIntent":
@@ -122,10 +125,12 @@ public class DemoSpeechlet implements Speechlet {
 				break
 			case "AMAZON.StopIntent":
 			case "AMAZON.CancelIntent":
-			case "AMAZON.PauseIntent":
 			    stopOrCancelPlayback()
 				break
-            default:
+			case "AMAZON.PauseIntent":
+				pausePlayback(session,request)
+				break
+			default:
                 didNotUnderstand()
                 break
         }
@@ -133,13 +138,17 @@ public class DemoSpeechlet implements Speechlet {
 
 
 	@CompileStatic(TypeCheckingMode.SKIP) // do some meta stuff
-    public SpeechletResponse playEpisode(IntentRequest request, Session session) {
+    public SpeechletResponse playEpisode(IntentRequest request, Session session, Context context) {
 
 
+		log.debug("context:${context}")
+		log.debug("context.audioPlayer.playerActivity:${context?.audioPlayer?.playerActivity}")
+		log.debug("context.system.application.applicationId:${context?.system?.application?.applicationId}")
         Slot episodeNumber = request.intent.getSlot("podcastNumber")
 
         log.debug("episodeNumber:"+episodeNumber.value)
 
+		session.setAttribute("podcastNumber",episodeNumber.value)
         String speechText = "Starting playback of Groovy Podcast Episode ${episodeNumber?.value}"
         // Create the Simple card content.
         SimpleCard card = new SimpleCard()
@@ -169,7 +178,7 @@ public class DemoSpeechlet implements Speechlet {
 		// replace http with https or alexa won't play it
 		streamUrl = streamUrl.replaceAll('http','https')
 		log.debug("streamUrl replaced:${streamUrl}")
-
+		session.setAttribute("streamUrl",streamUrl)
 
 		if (streamUrl && streamUrl.size() > 0) {
 			Stream audioStream = new Stream()
@@ -198,11 +207,65 @@ public class DemoSpeechlet implements Speechlet {
 		}
 
     }
-    @Override
+
+	@CompileStatic(TypeCheckingMode.SKIP) // do some meta stuff
+	public SpeechletResponse resumeEpisode(IntentRequest request, Session session, Context context) {
+
+
+
+		log.debug("context:${context}")
+		log.debug("context.audioPlayer.playerActivity:${context?.audioPlayer?.playerActivity}")
+		log.debug("context.audioPlayer.token:${context?.audioPlayer?.token}")
+
+		String episodeNumber = session.getAttribute("podcastNumber")
+
+		log.debug("resuming episodeNumber:"+episodeNumber)
+
+		String streamUrl = session.getAttribute("streamUrl")
+
+		String speechText = "Resume not supported: Restarting playback of Groovy Podcast Episode ${episodeNumber} from beginning"
+		// Create the Simple card content.
+		SimpleCard card = new SimpleCard()
+		card.setTitle(title)
+		card.setContent(speechText) //TODO auto retrieve show notes here
+
+
+
+
+		if (streamUrl && streamUrl.size() > 0) {
+			Stream audioStream = new Stream()
+			audioStream.offsetInMilliseconds = 0 //TODO get this from request (sdk update?)
+
+			audioStream.url = streamUrl
+			audioStream.setToken(streamUrl.hashCode() as String)
+			audioStream.offsetInMilliseconds = 0
+			AudioItem audioItem = new AudioItem(audioStream)
+
+
+			AudioDirectivePlay audioPlayerPlay = new AudioDirectivePlay(audioItem)
+
+			// Create the plain text output.
+			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
+			speech.setText(speechText)
+
+
+			SpeechletResponse.newTellResponse(speech, card, [audioPlayerPlay] as List<AudioDirective>)
+		} else {
+			def s = "I'm sorry this skill doesn't currently support resume. Say Open Groovy Podcast and start again"
+			card.content = s
+			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
+			speech.setText(s);
+			SpeechletResponse.newTellResponse(speech, card)
+		}
+
+	}
+
+	@Override
     public void onSessionEnded(final SessionEndedRequest request, final Session session)
             throws SpeechletException {
         log.info("onSessionEnded requestId={}, sessionId={}", request.getRequestId(),
                 session.getSessionId());
+
         // any cleanup logic goes here
     }
 
@@ -212,7 +275,7 @@ public class DemoSpeechlet implements Speechlet {
      * @return SpeechletResponse spoken and visual response for the given intent
      */
     private SpeechletResponse getWelcomeResponse(final Session session) {
-        String speechText = "Welcome to Groovy Podcast Skill. To start playing a podcast say Play episode number"
+        String speechText = "Welcome to The More Groovy Podcast Skill. To start playing a podcast say Play episode number"
 
         //askResponseFancy(speechText, speechText, "https://s3.amazonaws.com/vanderfox-sounds/groovybaby1.mp3")
 		askResponse(speechText, speechText)
@@ -311,7 +374,35 @@ public class DemoSpeechlet implements Speechlet {
 		SpeechletResponse.newTellResponse(speech,card,[audioDirectiveClearQueue] as List<AudioDirective>)
 	}
 
-    private SpeechletResponse didNotUnderstand() {
+	private SpeechletResponse pausePlayback(Session session, IntentRequest request) {
+
+		Slot episodeNumber = request.intent.getSlot("podcastNumber")
+
+		AudioDirectiveStop audioDirectiveClearQueue = new AudioDirectiveStop()
+		//audioDirectiveClearQueue.clearBehaviour = "CLEAR_ALL"
+		String speechText = "Stopping playback. Resume is currently not supported. Say Open Groovy Podcast to start again."
+		// Create the Simple card content.
+		SimpleCard card = new SimpleCard()
+		card.setTitle(title)
+		card.setContent(speechText)
+
+		// Create the plain text output.
+		PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
+		speech.setText(speechText)
+
+		// Create reprompt
+		Reprompt reprompt = new Reprompt()
+		reprompt.setOutputSpeech(speech)
+
+
+
+		log.debug("Pausing intent")
+
+		SpeechletResponse.newTellResponse(speech,card,[audioDirectiveClearQueue] as List<AudioDirective>)
+	}
+
+
+	private SpeechletResponse didNotUnderstand() {
         String speechText = "I'm sorry.  I didn't understand what you said.  Say play episode number to play an episode.";
 
         askResponse(speechText, speechText)
