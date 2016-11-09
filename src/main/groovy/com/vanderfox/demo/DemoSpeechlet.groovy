@@ -27,6 +27,13 @@ import com.amazon.speech.ui.Reprompt
 import com.amazon.speech.ui.SimpleCard
 import com.amazon.speech.ui.SsmlOutputSpeech
 import com.amazon.speech.ui.Stream
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient
+import com.amazonaws.services.dynamodbv2.document.DynamoDB
+import com.amazonaws.services.dynamodbv2.document.Item
+import com.amazonaws.services.dynamodbv2.document.PrimaryKey
+import com.amazonaws.services.dynamodbv2.document.Table
+import com.amazonaws.services.dynamodbv2.model.ScanRequest
+import com.amazonaws.services.dynamodbv2.model.ScanResult
 import groovy.transform.CompileStatic
 import groovy.transform.TypeCheckingMode
 import org.slf4j.Logger;
@@ -128,7 +135,7 @@ public class DemoSpeechlet implements Speechlet {
 			    stopOrCancelPlayback()
 				break
 			case "AMAZON.PauseIntent":
-				pausePlayback(session,request)
+				pausePlayback(session,request,context)
 				break
 			default:
                 didNotUnderstand()
@@ -182,15 +189,28 @@ public class DemoSpeechlet implements Speechlet {
 
 		if (streamUrl && streamUrl.size() > 0) {
 			Stream audioStream = new Stream()
-			audioStream.offsetInMilliseconds = 0
-
 			audioStream.url = streamUrl
-			audioStream.setToken(streamUrl.hashCode() as String)
+			audioStream.setToken((request.getRequestId()+streamUrl).hashCode() as String)
 			audioStream.offsetInMilliseconds = 0
+			//TODO update offset when we revieve a pause event
 			AudioItem audioItem = new AudioItem(audioStream)
 
 
 			AudioDirectivePlay audioPlayerPlay = new AudioDirectivePlay(audioItem)
+
+			// write these to the dyanmo table to pause/resume will work (only way I've found)
+			AmazonDynamoDBClient amazonDynamoDBClient
+			amazonDynamoDBClient = new AmazonDynamoDBClient()
+			DynamoDB dynamoDB = new DynamoDB(amazonDynamoDBClient)
+
+			Table table = dynamoDB.getTable("podcast_playback_state")
+			Item tokenItem = new Item().withPrimaryKey("token",audioStream.getToken())
+			.withString("streamUrl",audioStream.url)
+			.withString("podcastNumber",episodeNumber.value)
+			.withNumber("offsetInMillis",0)
+			.withNumber("createdDate",System.currentTimeMillis())
+
+			table.putItem(tokenItem)
 
 			// Create the plain text output.
 			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
@@ -217,46 +237,47 @@ public class DemoSpeechlet implements Speechlet {
 		log.debug("context.audioPlayer.playerActivity:${context?.audioPlayer?.playerActivity}")
 		log.debug("context.audioPlayer.token:${context?.audioPlayer?.token}")
 
-		String episodeNumber = session.getAttribute("podcastNumber")
-
-		log.debug("resuming episodeNumber:"+episodeNumber)
-
-		String streamUrl = session.getAttribute("streamUrl")
-
-		String speechText = "Resume not supported: Restarting playback of Groovy Podcast Episode ${episodeNumber} from beginning"
-		// Create the Simple card content.
-		SimpleCard card = new SimpleCard()
-		card.setTitle(title)
-		card.setContent(speechText) //TODO auto retrieve show notes here
 
 
 
+		AmazonDynamoDBClient amazonDynamoDBClient
+		amazonDynamoDBClient = new AmazonDynamoDBClient()
+		DynamoDB dynamoDB = new DynamoDB(amazonDynamoDBClient)
 
-		if (streamUrl && streamUrl.size() > 0) {
+		Table table = dynamoDB.getTable("podcast_playback_state")
+		Item item = table.getItem(new PrimaryKey("token", context?.audioPlayer?.token))
+		if (item) {
+			String speechText = "Resuming playback of Groovy Podcast Episode ${item.getString("podcastNumber")}"
 			Stream audioStream = new Stream()
-			audioStream.offsetInMilliseconds = 0 //TODO get this from request (sdk update?)
-
-			audioStream.url = streamUrl
-			audioStream.setToken(streamUrl.hashCode() as String)
 			audioStream.offsetInMilliseconds = 0
+
+			audioStream.url = item.getString("streamUrl")
+			audioStream.setToken(item.getString("token"))
+			audioStream.offsetInMilliseconds = item.getNumber("offsetInMillis")
 			AudioItem audioItem = new AudioItem(audioStream)
 
 
 			AudioDirectivePlay audioPlayerPlay = new AudioDirectivePlay(audioItem)
-
-			// Create the plain text output.
 			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
 			speech.setText(speechText)
+			// Create the Simple card content.
 
-
+			SimpleCard card = new SimpleCard()
+			card.setTitle(title)
+			card.setContent(speechText) //TODO auto retrieve show notes here
 			SpeechletResponse.newTellResponse(speech, card, [audioPlayerPlay] as List<AudioDirective>)
 		} else {
-			def s = "I'm sorry this skill doesn't currently support resume. Say Open Groovy Podcast and start again"
-			card.content = s
+			String speechText = "I'm sorry I am unable to find your session to resume. Please say Alexa open Groovy Podcast and start over."
 			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
-			speech.setText(s);
+			speech.setText(speechText)
+			// Create the Simple card content.
+			SimpleCard card = new SimpleCard()
+			card.setTitle(title)
+			card.setContent(speechText) //TODO auto retrieve show notes here
 			SpeechletResponse.newTellResponse(speech, card)
 		}
+
+
 
 	}
 
@@ -374,13 +395,43 @@ public class DemoSpeechlet implements Speechlet {
 		SpeechletResponse.newTellResponse(speech,card,[audioDirectiveClearQueue] as List<AudioDirective>)
 	}
 
-	private SpeechletResponse pausePlayback(Session session, IntentRequest request) {
+	private SpeechletResponse pausePlayback(Session session, IntentRequest request, Context context) {
 
-		Slot episodeNumber = request.intent.getSlot("podcastNumber")
+
+
+		log.debug("context:${context}")
+		log.debug("context.audioPlayer.playerActivity:${context?.audioPlayer?.playerActivity}")
+		log.debug("context.audioPlayer.token:${context?.audioPlayer?.token}")
+
+
+
+
+		AmazonDynamoDBClient amazonDynamoDBClient
+		amazonDynamoDBClient = new AmazonDynamoDBClient()
+		DynamoDB dynamoDB = new DynamoDB(amazonDynamoDBClient)
+
+		Table table = dynamoDB.getTable("podcast_playback_state")
+		try {
+			Item item = table.getItem(new PrimaryKey("token", context?.audioPlayer?.token))
+
+			if (item) {
+				// update the offset where they paused at
+				Item tokenItem = new Item().withPrimaryKey("token", item.getString("token"))
+						.withString("streamUrl", item.getString("streamUrl"))
+						.withString("podcastNumber", item.getString("podcastNumber"))
+						.withNumber("offsetInMillis", context.audioPlayer.offsetInMilliseconds)
+						.withNumber("createdDate", item.getNumber("createdDate"))
+				table.deleteItem(new PrimaryKey("token",item.getString("token")))
+				table.putItem(tokenItem)
+				log.debug("found item: ${item.getString("podcastNumber")}")
+			}
+		} catch (Exception e) {
+			log.debug("Error getting item from dynamo db token:${context?.audioPlayer?.token}")
+		}
 
 		AudioDirectiveStop audioDirectiveClearQueue = new AudioDirectiveStop()
 		//audioDirectiveClearQueue.clearBehaviour = "CLEAR_ALL"
-		String speechText = "Stopping playback. Resume is currently not supported. Say Open Groovy Podcast to start again."
+		String speechText = "Pausing playback. Say resume to restart playback."
 		// Create the Simple card content.
 		SimpleCard card = new SimpleCard()
 		card.setTitle(title)
@@ -409,10 +460,17 @@ public class DemoSpeechlet implements Speechlet {
     }
 
 
-    /**
-     * Initializes the instance components if needed.
-     */
-    private void initializeComponents(Session session) {
-        // initialize any components here like set up a dynamodb connection
-    }
-}
+/**
+ * Initializes the instance components if needed.
+ */
+	private void initializeComponents(Session session) {
+		AmazonDynamoDBClient amazonDynamoDBClient;
+		amazonDynamoDBClient = new AmazonDynamoDBClient();
+		/*ScanRequest req = new ScanRequest();
+		req.setTableName("HeroQuiz");
+		ScanResult result = amazonDynamoDBClient.scan(req)
+		List quizItems = result.items
+		int tableRowCount = quizItems.size()
+		session.setAttribute("tableRowCount", Integer.toString(tableRowCount))
+		log.info("This many rows in the table:  " + tableRowCount)*/
+	}}
