@@ -296,7 +296,7 @@ public class DemoSpeechlet implements Speechlet {
      * @return SpeechletResponse spoken and visual response for the given intent
      */
     private SpeechletResponse getWelcomeResponse(final Session session) {
-        String speechText = "Welcome to The More Groovy Podcast Skill. To start playing a podcast say Play episode number"
+        String speechText = "Welcome to The Groovy Podcast Skill. To start playing a podcast say Play episode number"
 
         //askResponseFancy(speechText, speechText, "https://s3.amazonaws.com/vanderfox-sounds/groovybaby1.mp3")
 		askResponse(speechText, speechText)
