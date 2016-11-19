@@ -1,6 +1,5 @@
 package com.vanderfox.demo
 
-import com.amazon.speech.speechlet.lambda.SpeechletRequestStreamHandler
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -14,7 +13,7 @@ import org.slf4j.LoggerFactory
  * this project using the {@code lambda-compile} Ant task and upload the resulting zip file to power
  * your function.
  */
-public final class SpeechletRequestStreamHandler extends SpeechletRequestStreamHandler {
+public final class SpeechletRequestStreamHandler extends com.amazon.speech.speechlet.lambda.SpeechletRequestStreamHandler {
     private  static final Logger log = LoggerFactory.getLogger(SpeechletRequestStreamHandler.class)
     private static final Set<String> supportedApplicationIds = new HashSet<String>()
     static {
@@ -24,7 +23,7 @@ public final class SpeechletRequestStreamHandler extends SpeechletRequestStreamH
          */
         final Properties properties = new Properties();
         try {
-            InputStream stream = DemoSpeechlet.class.getClassLoader()getResourceAsStream("springSocial.properties")
+            InputStream stream = GroovyPodcastSpeechlet.class.getClassLoader()getResourceAsStream("speechlet.properties")
             properties.load(stream);
 
             def property = properties.getProperty("awsApplicationId")
@@ -43,7 +42,7 @@ public final class SpeechletRequestStreamHandler extends SpeechletRequestStreamH
 
 
     public SpeechletRequestStreamHandler() {
-        super(new DemoSpeechlet(), supportedApplicationIds);
+        super(new GroovyPodcastSpeechlet(), supportedApplicationIds);
     }
 
 

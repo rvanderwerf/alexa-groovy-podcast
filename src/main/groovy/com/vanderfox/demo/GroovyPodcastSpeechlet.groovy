@@ -32,8 +32,6 @@ import com.amazonaws.services.dynamodbv2.document.DynamoDB
 import com.amazonaws.services.dynamodbv2.document.Item
 import com.amazonaws.services.dynamodbv2.document.PrimaryKey
 import com.amazonaws.services.dynamodbv2.document.Table
-import com.amazonaws.services.dynamodbv2.model.ScanRequest
-import com.amazonaws.services.dynamodbv2.model.ScanResult
 import groovy.transform.CompileStatic
 import groovy.transform.TypeCheckingMode
 import org.slf4j.Logger;
@@ -44,9 +42,9 @@ import org.slf4j.LoggerFactory
  * @author Lee Fox and Ryan Vanderwerf
  */
 @CompileStatic
-public class DemoSpeechlet implements Speechlet {
-    private static final Logger log = LoggerFactory.getLogger(DemoSpeechlet.class);
-    String title = "Demo Skill"
+public class GroovyPodcastSpeechlet implements Speechlet {
+    private static final Logger log = LoggerFactory.getLogger(GroovyPodcastSpeechlet.class);
+    String title = "The Groovy Podcast Player Skill"
 
     @Override
     SpeechletResponse onPlaybackStarted(PlaybackStartedRequest playbackStartedRequest, Context context) throws SpeechletException {
@@ -119,12 +117,15 @@ public class DemoSpeechlet implements Speechlet {
         log.debug("incoming intent:${intentName}")
 
         switch (intentName) {
+			case "PlayLatestEpisodeIntent":
+				playLatestEpisode(request,session, context)
+				break;
             case "PlayEpisodeIntent":
 				playEpisode(request,session, context)
 				break
 			case "AMAZON.ResumeIntent":
-                  resumeEpisode(request,session, context)
-                  break
+                resumeEpisode(request,session, context)
+                break
 
             case "AMAZON.HelpIntent":
 			case "HelpIntent":
@@ -154,6 +155,9 @@ public class DemoSpeechlet implements Speechlet {
         Slot episodeNumber = request.intent.getSlot("podcastNumber")
 
         log.debug("episodeNumber:"+episodeNumber.value)
+		if (!episodeNumber?.value) {
+			return didNotUnderstand()
+		}
 
 		session.setAttribute("podcastNumber",episodeNumber.value)
         String speechText = "Starting playback of Groovy Podcast Episode ${episodeNumber?.value}"
@@ -168,6 +172,7 @@ public class DemoSpeechlet implements Speechlet {
 
         def slurper = new XmlParser(false,false).parseText(rssFeed)
         if (slurper) {
+
 			slurper.channel.item.each { item ->
 				//log.debug("item content:${item}")
 				log.debug("found item:"+item.title.text())
@@ -177,6 +182,11 @@ public class DemoSpeechlet implements Speechlet {
 				if (item.title.text().indexOf(episodeNumber.value)!= -1) {
 					log.debug("found episode:${episodeNumber.value} streamurl:${item.enclosure.@url.value[0]}")
 					streamUrl = item.enclosure.@url.value[0].toString()
+					card.setTitle((String)item.title.text())
+					// we need to strip html tags out of the card because it is text only allowed
+					String description = item.description.text()
+					description = description.replaceAll("<.*?>", "")
+					card.setContent(description)
 				}
 
 			}
@@ -227,6 +237,105 @@ public class DemoSpeechlet implements Speechlet {
 		}
 
     }
+
+
+	@CompileStatic(TypeCheckingMode.SKIP) // do some meta stuff
+	public SpeechletResponse playLatestEpisode(IntentRequest request, Session session, Context context) {
+
+
+		log.debug("Playing latest episode context:${context}")
+		log.debug("context.audioPlayer.playerActivity:${context?.audioPlayer?.playerActivity}")
+		log.debug("context.system.application.applicationId:${context?.system?.application?.applicationId}")
+		String episodeNumber = ""
+
+		session.setAttribute("podcastNumber",episodeNumber.value)
+		String speechText = "Starting playback of Latest Groovy Podcast Episode"
+		// Create the Simple card content.
+		SimpleCard card = new SimpleCard()
+		card.setTitle(title)
+		card.setContent(speechText) //TODO auto retrieve show notes here
+
+
+		String streamUrl = ""
+		def rssFeed = "https://groovypodcast.podbean.com/feed/".toURL().text
+
+		def slurper = new XmlParser(false,false).parseText(rssFeed)
+		if (slurper) {
+
+			long lastEpisodeDate = 0
+			slurper.channel.item.each { item ->
+				//log.debug("item content:${item}")
+				log.debug("found item:"+item.title.text())
+				log.debug("found link:"+item.link.text())
+				log.debug("found enclosure:"+item.enclosure)
+				log.debug("found enclosure pubDate: ${item.pubDate.text()}")
+				String pubDate = item.pubDate.text()
+				long thisEpisodeDate = Date.parse("EEE, dd MMM yyyy HH:mm:ss ZZZZZ",pubDate).time
+
+				if (thisEpisodeDate > lastEpisodeDate) {
+					log.debug("found episode:${episodeNumber.value} streamurl:${item.enclosure.@url.value[0]}")
+					streamUrl = item.enclosure.@url.value[0].toString()
+					card.setTitle((String)item.title.text())
+					String description = item.description.text()
+					description = description.replaceAll("<.*?>", "")
+					card.setContent(description)
+					try {
+						episodeNumber = item.title.text().findAll(/\d+/)*.toInteger()
+					} catch (Exception) {
+						//keep going if an episode is not parseable to find the number
+						log.debug("skipping episode with title:${item.title.text} - no numbers found")
+					}
+				}
+				lastEpisodeDate = thisEpisodeDate
+			}
+		}
+		log.debug("streamUrl:${streamUrl}")
+		// replace http with https or alexa won't play it
+		streamUrl = streamUrl.replaceAll('http','https')
+		log.debug("streamUrl replaced:${streamUrl}")
+		session.setAttribute("streamUrl",streamUrl)
+
+		if (streamUrl && streamUrl.size() > 0) {
+			Stream audioStream = new Stream()
+			audioStream.url = streamUrl
+			audioStream.setToken((request.getRequestId()+streamUrl).hashCode() as String)
+			audioStream.offsetInMilliseconds = 0
+			//TODO update offset when we revieve a pause event
+			AudioItem audioItem = new AudioItem(audioStream)
+
+
+			AudioDirectivePlay audioPlayerPlay = new AudioDirectivePlay(audioItem)
+
+			// write these to the dyanmo table to pause/resume will work (only way I've found)
+			AmazonDynamoDBClient amazonDynamoDBClient
+			amazonDynamoDBClient = new AmazonDynamoDBClient()
+			DynamoDB dynamoDB = new DynamoDB(amazonDynamoDBClient)
+
+			Table table = dynamoDB.getTable("podcast_playback_state")
+			Item tokenItem = new Item().withPrimaryKey("token",audioStream.getToken())
+					.withString("streamUrl",audioStream.url)
+					.withString("podcastNumber",episodeNumber)
+					.withNumber("offsetInMillis",0)
+					.withNumber("createdDate",System.currentTimeMillis())
+
+			table.putItem(tokenItem)
+
+			// Create the plain text output.
+			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
+			speech.setText(speechText)
+
+
+			SpeechletResponse.newTellResponse(speech, card, [audioPlayerPlay] as List<AudioDirective>)
+		} else {
+			def s = "I'm sorry I can't find that podcast"
+			card.content = s
+			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
+			speech.setText(s);
+			SpeechletResponse.newTellResponse(speech, card)
+		}
+
+	}
+
 
 	@CompileStatic(TypeCheckingMode.SKIP) // do some meta stuff
 	public SpeechletResponse resumeEpisode(IntentRequest request, Session session, Context context) {
@@ -296,7 +405,7 @@ public class DemoSpeechlet implements Speechlet {
      * @return SpeechletResponse spoken and visual response for the given intent
      */
     private SpeechletResponse getWelcomeResponse(final Session session) {
-        String speechText = "Welcome to The Groovy Podcast Skill. To start playing a podcast say Play episode number"
+        String speechText = "Welcome to The Groovy Podcast Skill. To start playing a podcast say 'Play episode number' or say 'Play latest episode'"
 
         //askResponseFancy(speechText, speechText, "https://s3.amazonaws.com/vanderfox-sounds/groovybaby1.mp3")
 		askResponse(speechText, speechText)
@@ -454,7 +563,7 @@ public class DemoSpeechlet implements Speechlet {
 
 
 	private SpeechletResponse didNotUnderstand() {
-        String speechText = "I'm sorry.  I didn't understand what you said.  Say play episode number to play an episode.";
+        String speechText = "I'm sorry.  I didn't understand what you said.  Say play episode number to play an episode or say play latest episode.";
 
         askResponse(speechText, speechText)
     }

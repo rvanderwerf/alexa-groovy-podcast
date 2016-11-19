@@ -2,6 +2,8 @@ PlayEpisodeIntent play {podcastNumber}
 PlayEpisodeIntent play number {podcastNumber}
 PlayEpisodeIntent play episode {podcastNumber}
 PlayEpisodeIntent play episode number {podcastNumber}
+PlayLatestEpisodeIntent play latest episode
+PlayLatestEpisodeIntent play latest
 AMAZON.HelpIntent help
 AMAZON.StopIntent stop
 AMAZON.CancelIntent cancel
