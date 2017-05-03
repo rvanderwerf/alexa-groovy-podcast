@@ -202,7 +202,7 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 			audioStream.url = streamUrl
 			audioStream.setToken((request.getRequestId()+streamUrl).hashCode() as String)
 			audioStream.offsetInMilliseconds = 0
-			//TODO update offset when we revieve a pause event
+
 			AudioItem audioItem = new AudioItem(audioStream)
 
 
