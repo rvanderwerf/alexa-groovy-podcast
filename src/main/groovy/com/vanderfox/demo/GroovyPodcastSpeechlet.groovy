@@ -1,32 +1,47 @@
 package com.vanderfox.demo
 
+import com.amazon.speech.json.SpeechletRequestEnvelope
 import com.amazon.speech.slu.Intent
 import com.amazon.speech.slu.Slot
 import com.amazon.speech.speechlet.Context
+import com.amazon.speech.speechlet.Directive
 import com.amazon.speech.speechlet.IntentRequest
 import com.amazon.speech.speechlet.LaunchRequest
-import com.amazon.speech.speechlet.PlaybackFailedRequest
-import com.amazon.speech.speechlet.PlaybackFinishedRequest
-import com.amazon.speech.speechlet.PlaybackNearlyFinishedRequest
-import com.amazon.speech.speechlet.PlaybackStartedRequest
-import com.amazon.speech.speechlet.PlaybackStoppedRequest
+
 import com.amazon.speech.speechlet.Session
 import com.amazon.speech.speechlet.SessionEndedRequest
 import com.amazon.speech.speechlet.SessionStartedRequest
 import com.amazon.speech.speechlet.Speechlet
 import com.amazon.speech.speechlet.SpeechletException
 import com.amazon.speech.speechlet.SpeechletResponse
-import com.amazon.speech.speechlet.SystemExceptionEncounteredRequest
-import com.amazon.speech.ui.AudioDirective
-import com.amazon.speech.ui.AudioDirectiveClearQueue
-import com.amazon.speech.ui.AudioDirectivePlay
-import com.amazon.speech.ui.AudioDirectiveStop
-import com.amazon.speech.ui.AudioItem
+import com.amazon.speech.speechlet.SpeechletV2
+import com.amazon.speech.speechlet.SupportedInterfaces
+import com.amazon.speech.speechlet.interfaces.audioplayer.AudioItem
+import com.amazon.speech.speechlet.interfaces.audioplayer.AudioPlayer
+import com.amazon.speech.speechlet.interfaces.audioplayer.AudioPlayerInterface
+import com.amazon.speech.speechlet.interfaces.audioplayer.AudioPlayerState
+import com.amazon.speech.speechlet.interfaces.audioplayer.PlayBehavior
+import com.amazon.speech.speechlet.interfaces.audioplayer.Stream
+import com.amazon.speech.speechlet.interfaces.audioplayer.directive.ClearQueueDirective
+import com.amazon.speech.speechlet.interfaces.audioplayer.directive.PlayDirective
+import com.amazon.speech.speechlet.interfaces.audioplayer.directive.StopDirective
+import com.amazon.speech.speechlet.interfaces.audioplayer.request.PlaybackFailedRequest
+import com.amazon.speech.speechlet.interfaces.audioplayer.request.PlaybackFinishedRequest
+import com.amazon.speech.speechlet.interfaces.audioplayer.request.PlaybackNearlyFinishedRequest
+import com.amazon.speech.speechlet.interfaces.audioplayer.request.PlaybackStartedRequest
+import com.amazon.speech.speechlet.interfaces.audioplayer.request.PlaybackStoppedRequest
+import com.amazon.speech.speechlet.interfaces.display.directive.RenderTemplateDirective
+import com.amazon.speech.speechlet.interfaces.display.element.ImageInstance
+import com.amazon.speech.speechlet.interfaces.display.element.RichText
+import com.amazon.speech.speechlet.interfaces.display.template.BodyTemplate1
+import com.amazon.speech.speechlet.interfaces.system.SystemInterface
+import com.amazon.speech.speechlet.interfaces.system.SystemState
+import com.amazon.speech.ui.Card
+import com.amazon.speech.ui.OutputSpeech
 import com.amazon.speech.ui.PlainTextOutputSpeech
 import com.amazon.speech.ui.Reprompt
 import com.amazon.speech.ui.SimpleCard
 import com.amazon.speech.ui.SsmlOutputSpeech
-import com.amazon.speech.ui.Stream
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient
 import com.amazonaws.services.dynamodbv2.document.DynamoDB
 import com.amazonaws.services.dynamodbv2.document.Item
@@ -42,51 +57,53 @@ import org.slf4j.LoggerFactory
  * @author Lee Fox and Ryan Vanderwerf
  */
 @CompileStatic
-public class GroovyPodcastSpeechlet implements Speechlet {
+public class GroovyPodcastSpeechlet implements SpeechletV2, AudioPlayer {
     private static final Logger log = LoggerFactory.getLogger(GroovyPodcastSpeechlet.class);
     String title = "The Groovy Podcast Player Skill"
 
-    @Override
-    SpeechletResponse onPlaybackStarted(PlaybackStartedRequest playbackStartedRequest, Context context) throws SpeechletException {
 
-        // don't do anything must return at least an empty list
-        SpeechletResponse.newTellResponse([] as List<AudioDirective>)
+
+
+
+	@Override
+	SpeechletResponse onPlaybackStarted(SpeechletRequestEnvelope<PlaybackStartedRequest> requestEnvelope) {
+
+        // don't do anything must return at least an empty lis
+
+        tellResponse("","",[] as ArrayList<Directive>,requestEnvelope.getContext())
     }
 
     @Override
-    SpeechletResponse onPlaybackFinished(PlaybackFinishedRequest playbackFinishedRequest, Context context) throws SpeechletException {
+	SpeechletResponse onPlaybackFinished(SpeechletRequestEnvelope<PlaybackFinishedRequest> requestEnvelope) {
 
-        SpeechletResponse.newTellResponse([] as List<AudioDirective>)
+		tellResponse("","",[] as ArrayList<Directive>,requestEnvelope.getContext())
     }
 
     @Override
-    void onPlaybackStopped(PlaybackStoppedRequest playbackStoppedRequest, Context context) throws SpeechletException {
+	SpeechletResponse onPlaybackStopped(SpeechletRequestEnvelope<PlaybackStoppedRequest> requestEnvelope) {
         // cannot return anything here
     }
 
     @Override
-    SpeechletResponse onPlaybackNearlyFinished(PlaybackNearlyFinishedRequest playbackNearlyFinishedRequest, Context context) throws SpeechletException {
+	SpeechletResponse onPlaybackNearlyFinished(SpeechletRequestEnvelope<PlaybackNearlyFinishedRequest> requestEnvelope) {
 
         // do nothing
-        SpeechletResponse.newTellResponse([] as List<AudioDirective>)
+		tellResponse("","",[] as ArrayList<Directive>,requestEnvelope.getContext())
     }
 
     @Override
-    SpeechletResponse onPlaybackFailed(PlaybackFailedRequest playbackFailedRequest, Context context) throws SpeechletException {
+	SpeechletResponse onPlaybackFailed(SpeechletRequestEnvelope<PlaybackFailedRequest> requestEnvelope) {
         //clear queue as something is wrong
-        AudioDirectiveClearQueue audioDirectiveClearQueue = new AudioDirectiveClearQueue()
-        SpeechletResponse.newTellResponse([audioDirectiveClearQueue] as List<AudioDirective>)
+        ClearQueueDirective audioDirectiveClearQueue = new ClearQueueDirective()
+		tellResponse("","",[audioDirectiveClearQueue] as ArrayList<Directive>,requestEnvelope.getContext())
     }
 
-    @Override
-    void onSystemException(SystemExceptionEncounteredRequest systemExceptionEncounteredRequest) throws SpeechletException {
-        log.debug("error encountered: cause: ${systemExceptionEncounteredRequest.cause.requestId} error: ${systemExceptionEncounteredRequest.error.message}")
-    }
 
     @Override
-    public void onSessionStarted(final SessionStartedRequest request, final Session session)
-            throws SpeechletException {
-        log.info("onSessionStarted requestId={}, sessionId={}", request.getRequestId(),
+	void onSessionStarted(SpeechletRequestEnvelope<SessionStartedRequest> requestEnvelope)
+			throws SpeechletException {
+		Session session = requestEnvelope.getSession()
+        log.info("onSessionStarted requestId={}, sessionId={}", requestEnvelope.request.getRequestId(),
                 session.getSessionId())
 
 
@@ -98,17 +115,22 @@ public class GroovyPodcastSpeechlet implements Speechlet {
     }
 
     @Override
-    public SpeechletResponse onLaunch(final LaunchRequest request, final Session session)
-            throws SpeechletException {
-        log.info("onLaunch requestId={}, sessionId={}", request.getRequestId(),
-                session.getSessionId());
+	SpeechletResponse onLaunch(SpeechletRequestEnvelope<LaunchRequest> requestEnvelope)
+			throws SpeechletException {
 
-        getWelcomeResponse(session);
+        log.info("onLaunch requestId={}, sessionId={}", requestEnvelope.getRequest().getRequestId(),
+                requestEnvelope.getSession().getSessionId());
+
+        getWelcomeResponse(requestEnvelope.session);
     }
 
-    @Override
-    public SpeechletResponse onIntent(final IntentRequest request, final Session session, Context context)
-            throws SpeechletException {
+
+	@Override
+	SpeechletResponse onIntent(SpeechletRequestEnvelope<IntentRequest> requestEnvelope) {
+
+		Session session = requestEnvelope.getSession()
+		IntentRequest request = requestEnvelope.getRequest()
+		Context context = requestEnvelope.getContext()
         log.info("onIntent requestId={}, sessionId={}", request.getRequestId(),
                 session.getSessionId());
 
@@ -136,7 +158,7 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 			    stopOrCancelPlayback()
 				break
 			case "AMAZON.PauseIntent":
-				pausePlayback(session,request,context)
+				pausePlayback(session,request,requestEnvelope)
 				break
 			default:
                 didNotUnderstand()
@@ -206,7 +228,7 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 			AudioItem audioItem = new AudioItem(audioStream)
 
 
-			AudioDirectivePlay audioPlayerPlay = new AudioDirectivePlay(audioItem)
+			PlayDirective audioPlayerPlay = new PlayDirective(audioItem)
 
 			// write these to the dyanmo table to pause/resume will work (only way I've found)
 			AmazonDynamoDBClient amazonDynamoDBClient
@@ -227,13 +249,13 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 			speech.setText(speechText)
 
 
-			SpeechletResponse.newTellResponse(speech, card, [audioPlayerPlay] as List<AudioDirective>)
+			tellResponse(card, speech, [audioPlayerPlay] as List<Directive>, context)
 		} else {
 			def s = "I'm sorry I can't find that podcast"
 			card.content = s
 			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
 			speech.setText(s);
-			SpeechletResponse.newTellResponse(speech, card)
+			tellResponse(card, speech,[] as List<Directive>, context)
 		}
 
     }
@@ -301,10 +323,11 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 			audioStream.setToken((request.getRequestId()+streamUrl).hashCode() as String)
 			audioStream.offsetInMilliseconds = 0
 			//TODO update offset when we revieve a pause event
-			AudioItem audioItem = new AudioItem(audioStream)
+			AudioItem audioItem = new AudioItem()
+			audioItem.stream = audioStream
 
-
-			AudioDirectivePlay audioPlayerPlay = new AudioDirectivePlay(audioItem)
+			PlayDirective audioPlayerPlay = new PlayDirective()
+			audioPlayerPlay.audioItem = audioItem
 
 			// write these to the dyanmo table to pause/resume will work (only way I've found)
 			AmazonDynamoDBClient amazonDynamoDBClient
@@ -325,13 +348,13 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 			speech.setText(speechText)
 
 
-			SpeechletResponse.newTellResponse(speech, card, [audioPlayerPlay] as List<AudioDirective>)
+			tellResponse(speechText, speechText, [audioPlayerPlay] as List<Directive>, context)
 		} else {
 			def s = "I'm sorry I can't find that podcast"
 			card.content = s
 			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
 			speech.setText(s);
-			SpeechletResponse.newTellResponse(speech, card)
+			tellResponse(speechText, speechText, [] as List<Directive>, context)
 		}
 
 	}
@@ -362,11 +385,13 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 
 			audioStream.url = item.getString("streamUrl")
 			audioStream.setToken(item.getString("token"))
-			audioStream.offsetInMilliseconds = item.getNumber("offsetInMillis")
-			AudioItem audioItem = new AudioItem(audioStream)
+			audioStream.seoffsetInMilliseconds = item.getNumber("offsetInMillis")
+			AudioItem audioItem = new AudioItem()
+			audioItem.stream = audioStream
 
 
-			AudioDirectivePlay audioPlayerPlay = new AudioDirectivePlay(audioItem)
+			PlayDirective audioPlayerPlay = new PlayDirective()
+			audioPlayerPlay.audioItem = audioItem
 			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
 			speech.setText(speechText)
 			// Create the Simple card content.
@@ -374,7 +399,7 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 			SimpleCard card = new SimpleCard()
 			card.setTitle(title)
 			card.setContent(speechText) //TODO auto retrieve show notes here
-			SpeechletResponse.newTellResponse(speech, card, [audioPlayerPlay] as List<AudioDirective>)
+			tellResponse(card, speech, [audioPlayerPlay] as List<Directive>)
 		} else {
 			String speechText = "I'm sorry I am unable to find your session to resume. Please say Alexa open Groovy Podcast and start over."
 			PlainTextOutputSpeech speech = new PlainTextOutputSpeech()
@@ -391,10 +416,10 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 	}
 
 	@Override
-    public void onSessionEnded(final SessionEndedRequest request, final Session session)
-            throws SpeechletException {
-        log.info("onSessionEnded requestId={}, sessionId={}", request.getRequestId(),
-                session.getSessionId());
+	void onSessionEnded(SpeechletRequestEnvelope<SessionEndedRequest> requestEnvelope) {
+
+        log.info("onSessionEnded requestId={}, sessionId={}", requestEnvelope.request.getRequestId(),
+                requestEnvelope.session.getSessionId());
 
         // any cleanup logic goes here
     }
@@ -429,24 +454,6 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 
         SpeechletResponse.newAskResponse(speech, reprompt, card)
     }
-
-    private SpeechletResponse tellResponse(String cardText, String speechText) {
-        // Create the Simple card content.
-        SimpleCard card = new SimpleCard();
-        card.setTitle(title);
-        card.setContent(cardText);
-
-        // Create the plain text output.
-        PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-        speech.setText(speechText);
-
-        // Create reprompt
-        Reprompt reprompt = new Reprompt();
-        reprompt.setOutputSpeech(speech);
-
-        SpeechletResponse.newTellResponse(speech, card);
-    }
-
 
 
     private SpeechletResponse askResponseFancy(String cardText, String speechText, String fileUrl) {
@@ -483,7 +490,7 @@ public class GroovyPodcastSpeechlet implements Speechlet {
     }
 
 	private SpeechletResponse stopOrCancelPlayback() {
-		AudioDirectiveStop audioDirectiveClearQueue = new AudioDirectiveStop()
+		StopDirective audioDirectiveClearQueue = new StopDirective()
 		//audioDirectiveClearQueue.clearBehaviour = "CLEAR_ALL"
 		String speechText = "Stopping. GoodBye."
 		// Create the Simple card content.
@@ -501,16 +508,18 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 
         log.debug("Stopping intent")
 
-		SpeechletResponse.newTellResponse(speech,card,[audioDirectiveClearQueue] as List<AudioDirective>)
+		tellResponse(card,speech,[audioDirectiveClearQueue] as List<Directive>)
 	}
 
-	private SpeechletResponse pausePlayback(Session session, IntentRequest request, Context context) {
+	private SpeechletResponse pausePlayback(Session session, IntentRequest request, SpeechletRequestEnvelope<IntentRequest> requestEnvelope) {
 
 
 
-		log.debug("context:${context}")
-		log.debug("context.audioPlayer.playerActivity:${context?.audioPlayer?.playerActivity}")
-		log.debug("context.audioPlayer.token:${context?.audioPlayer?.token}")
+		log.debug("context:${requestEnvelope.context.toString()}")
+		SystemState state = getSystemState(requestEnvelope.context)
+		AudioPlayerState audioPlayerState = getAudioPlayerState(requestEnvelope.context)
+		log.debug("context.audioPlayer.playerActivity:${audioPlayerState.playerActivity.name()}")
+		log.debug("context.audioPlayer.token:${audioPlayerState.token}")
 
 
 
@@ -521,24 +530,24 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 
 		Table table = dynamoDB.getTable("podcast_playback_state")
 		try {
-			Item item = table.getItem(new PrimaryKey("token", context?.audioPlayer?.token))
+			Item item = table.getItem(new PrimaryKey("token", audioPlayerState.token))
 
 			if (item) {
 				// update the offset where they paused at
 				Item tokenItem = new Item().withPrimaryKey("token", item.getString("token"))
 						.withString("streamUrl", item.getString("streamUrl"))
 						.withString("podcastNumber", item.getString("podcastNumber"))
-						.withNumber("offsetInMillis", context.audioPlayer.offsetInMilliseconds)
+						.withNumber("offsetInMillis", audioPlayerState.offsetInMilliseconds)
 						.withNumber("createdDate", item.getNumber("createdDate"))
 				table.deleteItem(new PrimaryKey("token",item.getString("token")))
 				table.putItem(tokenItem)
 				log.debug("found item: ${item.getString("podcastNumber")}")
 			}
 		} catch (Exception e) {
-			log.debug("Error getting item from dynamo db token:${context?.audioPlayer?.token}")
+			log.debug("Error getting item from dynamo db token:${audioPlayerState.token}")
 		}
 
-		AudioDirectiveStop audioDirectiveClearQueue = new AudioDirectiveStop()
+		StopDirective audioDirectiveClearQueue = new StopDirective()
 		//audioDirectiveClearQueue.clearBehaviour = "CLEAR_ALL"
 		String speechText = "Pausing playback. Say resume to restart playback."
 		// Create the Simple card content.
@@ -558,7 +567,7 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 
 		log.debug("Pausing intent")
 
-		SpeechletResponse.newTellResponse(speech,card,[audioDirectiveClearQueue] as List<AudioDirective>)
+		tellResponse(card,speech,[audioDirectiveClearQueue] as List<Directive>, requestEnvelope.context)
 	}
 
 
@@ -582,4 +591,77 @@ public class GroovyPodcastSpeechlet implements Speechlet {
 		int tableRowCount = quizItems.size()
 		session.setAttribute("tableRowCount", Integer.toString(tableRowCount))
 		log.info("This many rows in the table:  " + tableRowCount)*/
-	}}
+	}
+
+	private SystemState getSystemState(Context context) {
+		return context.getState(SystemInterface.class, SystemState.class);
+	}
+
+	private AudioPlayerState getAudioPlayerState(Context context) {
+		return context.getState(AudioPlayerInterface.class, AudioPlayerState.class);
+	}
+
+	private SpeechletResponse tellResponse(String cardText, String speechText, List<Directive> directives = [] as List<Directive>, Context context = null) {
+
+		SimpleCard card = new SimpleCard()
+		card.setContent(cardText)
+		PlainTextOutputSpeech outputSpeech = new PlainTextOutputSpeech()
+		outputSpeech.setText(speechText)
+		tellResponse(card,outputSpeech,directives,context)
+
+
+	}
+
+	private SpeechletResponse tellResponse(Card card, OutputSpeech outputSpeech, List<Directive> directives = [] as List<Directive>, Context context = null) {
+
+		RenderTemplateDirective renderTemplateDirective = buildBodyTemplate1(card.toString())
+
+
+
+
+		// Create reprompt
+		Reprompt reprompt = new Reprompt()
+		reprompt.setOutputSpeech(outputSpeech);
+
+		SpeechletResponse response = new SpeechletResponse()
+		SystemState systemState = getSystemState(context)
+		SupportedInterfaces supportedInterfaces = systemState.device.getSupportedInterfaces()
+		ArrayList<Directive> supportedDirectives = [] as ArrayList<Directive>
+		for (Directive directive: directives) {
+			if (supportedInterfaces.isInterfaceSupported(directive.class)) {
+				supportedDirectives.add(directive)
+			}
+		}
+		if (supportedDirectives.size() > 0) {
+			response.setDirectives(supportedDirectives)
+		}
+		boolean hasDisplay = false
+		response.setNullableShouldEndSession(true)
+		response.setOutputSpeech(outputSpeech)
+		response.setReprompt(reprompt)
+		response
+
+
+	}
+
+
+	private RenderTemplateDirective buildBodyTemplate1(String cardText) {
+		BodyTemplate1 template = new BodyTemplate1()
+		template.setTitle("Groovy Podcast")
+		BodyTemplate1.TextContent textContent = new BodyTemplate1.TextContent()
+		RichText richText = new RichText()
+		richText.text = cardText
+		textContent.setPrimaryText(richText)
+		template.setTextContent(textContent)
+		com.amazon.speech.speechlet.interfaces.display.element.Image backgroundImage = new com.amazon.speech.speechlet.interfaces.display.element.Image()
+		ImageInstance imageInstance = new ImageInstance()
+		imageInstance.setUrl("https://s-media-cache-ak0.pinimg.com/originals/e4/30/78/e43078050e9a8d5bc2f8a1ed09a77227.png")
+		ArrayList<ImageInstance> imageInstances = new ArrayList()
+		imageInstances.add(imageInstance)
+		backgroundImage.setSources(imageInstances)
+		template.setBackgroundImage(backgroundImage)
+		RenderTemplateDirective renderTemplateDirective = new RenderTemplateDirective()
+		renderTemplateDirective.setTemplate(template)
+		renderTemplateDirective
+	}
+}
