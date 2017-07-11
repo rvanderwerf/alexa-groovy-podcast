@@ -171,8 +171,9 @@ public class GroovyPodcastSpeechlet implements SpeechletV2, AudioPlayer {
     public SpeechletResponse playEpisode(IntentRequest request, Session session, Context context) {
 
 
+		AudioPlayerState playerState = getAudioPlayerState(context)
 		log.debug("context:${context}")
-		log.debug("context.audioPlayer.playerActivity:${context?.audioPlayer?.playerActivity}")
+		log.debug("context.audioPlayer.playerActivity:${playerState.playerActivity.name()}")
 		log.debug("context.system.application.applicationId:${context?.system?.application?.applicationId}")
         Slot episodeNumber = request.intent.getSlot("podcastNumber")
 
@@ -264,9 +265,9 @@ public class GroovyPodcastSpeechlet implements SpeechletV2, AudioPlayer {
 	@CompileStatic(TypeCheckingMode.SKIP) // do some meta stuff
 	public SpeechletResponse playLatestEpisode(IntentRequest request, Session session, Context context) {
 
-
+		AudioPlayerState playerState = getAudioPlayerState(context)
 		log.debug("Playing latest episode context:${context}")
-		log.debug("context.audioPlayer.playerActivity:${context?.audioPlayer?.playerActivity}")
+		log.debug("context.audioPlayer.playerActivity:${playerState.playerActivity.name()}")
 		log.debug("context.system.application.applicationId:${context?.system?.application?.applicationId}")
 		String episodeNumber = ""
 
@@ -364,10 +365,10 @@ public class GroovyPodcastSpeechlet implements SpeechletV2, AudioPlayer {
 	public SpeechletResponse resumeEpisode(IntentRequest request, Session session, Context context) {
 
 
-
+		AudioPlayerState playerState = getAudioPlayerState(context)
 		log.debug("context:${context}")
-		log.debug("context.audioPlayer.playerActivity:${context?.audioPlayer?.playerActivity}")
-		log.debug("context.audioPlayer.token:${context?.audioPlayer?.token}")
+		log.debug("context.audioPlayer.playerActivity:${playerState.playerActivity.name()}")
+		log.debug("context.audioPlayer.token:${playerState.token}")
 
 
 
@@ -377,7 +378,7 @@ public class GroovyPodcastSpeechlet implements SpeechletV2, AudioPlayer {
 		DynamoDB dynamoDB = new DynamoDB(amazonDynamoDBClient)
 
 		Table table = dynamoDB.getTable("podcast_playback_state")
-		Item item = table.getItem(new PrimaryKey("token", context?.audioPlayer?.token))
+		Item item = table.getItem(new PrimaryKey("token", playerState.token))
 		if (item) {
 			String speechText = "Resuming playback of Groovy Podcast Episode ${item.getString("podcastNumber")}"
 			Stream audioStream = new Stream()
