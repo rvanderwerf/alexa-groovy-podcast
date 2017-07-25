@@ -173,8 +173,8 @@ public class GroovyPodcastSpeechlet implements SpeechletV2, AudioPlayer {
 
 		AudioPlayerState playerState = getAudioPlayerState(context)
 		log.debug("context:${context}")
-		log.debug("context.audioPlayer.playerActivity:${playerState.playerActivity.name()}")
-		log.debug("context.system.application.applicationId:${context?.system?.application?.applicationId}")
+		log.debug("context.audioPlayer.playerActivity:${playerState?.playerActivity?.name()}")
+		//log.debug("context.system.application.applicationId:${context?.system?.application?.applicationId}")
         Slot episodeNumber = request.intent.getSlot("podcastNumber")
 
         log.debug("episodeNumber:"+episodeNumber.value)
@@ -267,8 +267,8 @@ public class GroovyPodcastSpeechlet implements SpeechletV2, AudioPlayer {
 
 		AudioPlayerState playerState = getAudioPlayerState(context)
 		log.debug("Playing latest episode context:${context}")
-		log.debug("context.audioPlayer.playerActivity:${playerState.playerActivity.name()}")
-		log.debug("context.system.application.applicationId:${context?.system?.application?.applicationId}")
+		log.debug("context.audioPlayer.playerActivity:${playerState?.playerActivity?.name}")
+		//log.debug("context.system.application.applicationId:${context?.system?.application?.applicationId}")
 		String episodeNumber = ""
 
 		session.setAttribute("podcastNumber",episodeNumber.value)
@@ -367,8 +367,8 @@ public class GroovyPodcastSpeechlet implements SpeechletV2, AudioPlayer {
 
 		AudioPlayerState playerState = getAudioPlayerState(context)
 		log.debug("context:${context}")
-		log.debug("context.audioPlayer.playerActivity:${playerState.playerActivity.name()}")
-		log.debug("context.audioPlayer.token:${playerState.token}")
+		log.debug("context.audioPlayer.playerActivity:${playerState?.playerActivity?.name()}")
+		log.debug("context.audioPlayer.token:${playerState?.token}")
 
 
 
@@ -431,7 +431,7 @@ public class GroovyPodcastSpeechlet implements SpeechletV2, AudioPlayer {
      * @return SpeechletResponse spoken and visual response for the given intent
      */
     private SpeechletResponse getWelcomeResponse(final Session session) {
-        String speechText = "Welcome to The Groovy Podcast Skill. To start playing a podcast say 'Play episode number' or say 'Play latest episode'"
+        String speechText = "Welcome to The Beta Groovy Podcast Skill. To start playing a podcast say 'Play episode number' or say 'Play latest episode'"
 
         //askResponseFancy(speechText, speechText, "https://s3.amazonaws.com/vanderfox-sounds/groovybaby1.mp3")
 		askResponse(speechText, speechText)
@@ -519,8 +519,8 @@ public class GroovyPodcastSpeechlet implements SpeechletV2, AudioPlayer {
 		log.debug("context:${requestEnvelope.context.toString()}")
 		SystemState state = getSystemState(requestEnvelope.context)
 		AudioPlayerState audioPlayerState = getAudioPlayerState(requestEnvelope.context)
-		log.debug("context.audioPlayer.playerActivity:${audioPlayerState.playerActivity.name()}")
-		log.debug("context.audioPlayer.token:${audioPlayerState.token}")
+		log.debug("context.audioPlayer.playerActivity:${audioPlayerState?.playerActivity?.toString()}")
+		log.debug("context.audioPlayer.token:${audioPlayerState?.token}")
 
 
 
@@ -599,7 +599,9 @@ public class GroovyPodcastSpeechlet implements SpeechletV2, AudioPlayer {
 	}
 
 	private AudioPlayerState getAudioPlayerState(Context context) {
-		return context.getState(AudioPlayerInterface.class, AudioPlayerState.class);
+		def playerState = context.getState(AudioPlayerInterface.class, AudioPlayerState.class)
+		log.debug("playerState=${playerState)}")
+		return playerState
 	}
 
 	private SpeechletResponse tellResponse(String cardText, String speechText, List<Directive> directives = [] as List<Directive>, Context context = null) {
